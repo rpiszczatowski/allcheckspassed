@@ -32544,16 +32544,17 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
-const checksAPI_1 = __nccwpck_require__(3638);
-const checksFilters_1 = __nccwpck_require__(6421);
-const timeFuncs_1 = __nccwpck_require__(8353);
 const fileExtractor_1 = __nccwpck_require__(9603);
-const checksConstants_1 = __nccwpck_require__(1763);
+const timeFuncs_1 = __nccwpck_require__(8353);
 const checkEmoji_1 = __nccwpck_require__(5331);
+const checksAPI_1 = __nccwpck_require__(3638);
+const checksConstants_1 = __nccwpck_require__(1763);
+const checksFilters_1 = __nccwpck_require__(6421);
 class Checks {
     // data
     allChecks = [];
     filteredChecks = [];
+    failingChecks = [];
     missingChecks = [];
     ownCheck; //the check from the workflow run itself
     // inputs
@@ -32650,9 +32651,9 @@ class Checks {
         if (!this.treatNeutralAsPassed) {
             failureConclusions.push(checksConstants_1.checkConclusion.NEUTRAL);
         }
-        let failingChecks = checks.filter((check) => failureConclusions.includes(check.conclusion));
+        this.failingChecks = checks.filter((check) => failureConclusions.includes(check.conclusion));
         // if any of the checks are failing and we wish to fail fast, then we will return true now - default behavior
-        if (failingChecks.length > 0 && this.failFast) {
+        if (this.failingChecks.length > 0 && this.failFast) {
             return { in_progress: false, passed: false };
         }
         // if any of the checks are still in_progress or queued or waiting, then we will return false
@@ -32671,7 +32672,7 @@ class Checks {
             return { in_progress: true, passed: false };
         }
         // if any of the checks are failing and we did not fail fast, then we will return true now
-        if (failingChecks.length > 0) {
+        if (this.failingChecks.length > 0) {
             return { in_progress: false, passed: false };
         }
         // if none of the above trigger, everything has finished and passed
@@ -32751,6 +32752,7 @@ class Checks {
         }
         // create an output with details of the checks evaluated
         core.setOutput("checks", JSON.stringify(filteredChecksExcludingOwnCheck)); // revisit why this is not working
+        core.setOutput("failing_checks", JSON.stringify(this.failingChecks));
         // missing checks
         core.setOutput("missing_checks", JSON.stringify(missingChecks)); // revisit why this is not working
         // fail the step if the checks did not pass and the user wants us to fail

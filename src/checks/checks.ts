@@ -1,11 +1,14 @@
 import * as core from "@actions/core";
+import { extractOwnCheckNameFromWorkflow } from "../utils/fileExtractor";
 import { IInputs } from "../utils/inputsExtractor";
+import { sleep } from "../utils/timeFuncs";
+import { addCheckConclusionEmoji } from "./checkEmoji";
 import { getAllChecks } from "./checksAPI";
 import {
-  ICheckInput,
-  ICheck,
-  IDetermineChecksStatus,
-} from "./checksInterfaces";
+  checkConclusion,
+  checkStatus,
+  GitHubActionsBotSlug,
+} from "./checksConstants";
 import {
   checkOneOfTheChecksInputIsEmpty,
   filterChecksWithMatchingNameAndAppId,
@@ -14,14 +17,11 @@ import {
   removeDuplicateEntriesChecksInputsFromSelf,
   takeMostRecentChecksForMatchingNameAndAppId,
 } from "./checksFilters";
-import { sleep } from "../utils/timeFuncs";
-import { extractOwnCheckNameFromWorkflow } from "../utils/fileExtractor";
 import {
-  checkConclusion,
-  checkStatus,
-  GitHubActionsBotSlug,
-} from "./checksConstants";
-import { addCheckConclusionEmoji } from "./checkEmoji";
+  ICheck,
+  ICheckInput,
+  IDetermineChecksStatus,
+} from "./checksInterfaces";
 
 interface IRepo {
   owner: string;
@@ -32,6 +32,7 @@ export default class Checks {
   // data
   private allChecks: ICheck[] = [];
   private filteredChecks: ICheck[] = [];
+  private failingChecks: ICheck[] = [];
   private missingChecks: ICheckInput[] = [];
   private ownCheck: ICheck | undefined; //the check from the workflow run itself
 
@@ -171,11 +172,11 @@ export default class Checks {
       failureConclusions.push(checkConclusion.NEUTRAL);
     }
 
-    let failingChecks = checks.filter((check) =>
+    this.failingChecks = checks.filter((check) =>
       failureConclusions.includes(check.conclusion!)
     );
     // if any of the checks are failing and we wish to fail fast, then we will return true now - default behavior
-    if (failingChecks.length > 0 && this.failFast) {
+    if (this.failingChecks.length > 0 && this.failFast) {
       return { in_progress: false, passed: false };
     }
 
@@ -201,7 +202,7 @@ export default class Checks {
     }
 
     // if any of the checks are failing and we did not fail fast, then we will return true now
-    if (failingChecks.length > 0) {
+    if (this.failingChecks.length > 0) {
       return { in_progress: false, passed: false };
     }
 
@@ -302,6 +303,7 @@ export default class Checks {
     // create an output with details of the checks evaluated
 
     core.setOutput("checks", JSON.stringify(filteredChecksExcludingOwnCheck)); // revisit why this is not working
+    core.setOutput("failing_checks", JSON.stringify(this.failingChecks));
 
     // missing checks
     core.setOutput("missing_checks", JSON.stringify(missingChecks)); // revisit why this is not working

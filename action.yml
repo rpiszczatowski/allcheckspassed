@@ -70,6 +70,8 @@ outputs:
     description: "List of checks that were evaluated"
   missing_checks:
     description: "List of checks that were not found on the commit"
+  failing_checks:
+    description: "List of checks that failed"
 
 runs:
   using: node20
